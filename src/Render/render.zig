@@ -5,20 +5,25 @@ const c = @import("../c.zig");
 
 const GameContext = @import("../game_context.zig").GameContext;
 
-const _logging = @import("../Debugging/logging.zig");
+const _render_test = @import("../Render/test.zig");
 
 const _component = @import("../Component/component.zig");
 const _texture = @import("../Component/texture.zig");
 const _text_field = @import("../Component/text_field.zig");
+const _ui_frame = @import("../Component/ui_frame.zig");
 const _position = @import("../Component/position.zig");
+const _bounds = @import("../Component/bounds.zig");
 
 const _entity = @import("../Entity/entity.zig");
 
 pub const Layers = struct {
-    pub const Background: i32 = 10000;
+    pub const Background: i32 = 100;
     pub const Foreground: i32 = 0;
-    pub const UI: i32 = -10000;
+    pub const UI: i32 = -1_000;
+    pub const UI_BG: i32 = -1_100;
 };
+
+const run_startup_tests = true;
 
 const texture_list = [_][]const u8{
     "resc/planet_back.png",
@@ -28,7 +33,6 @@ const texture_list = [_][]const u8{
 pub const Render = struct {
     alloc: std.mem.Allocator,
     context: *GameContext,
-    logger: ?*_logging.Logger,
 
     draw_count: usize,
 
@@ -39,12 +43,11 @@ pub const Render = struct {
         Stopped,
     },
 
-    pub fn init(alloc: std.mem.Allocator, logger: ?*_logging.Logger, context: *GameContext) Render {
+    pub fn init(alloc: std.mem.Allocator, context: *GameContext) Render {
         _texture.context = context;
         return Render{
             .alloc = alloc,
             .context = context,
-            .logger = logger,
 
             .draw_count = 0,
 
@@ -65,6 +68,7 @@ pub const Render = struct {
     pub fn updateLoop(self: *Render) void {
         const dt = c.GetFrameTime();
 
+        self.handleInput();
         drawFrame(self, dt);
     }
 
@@ -77,10 +81,11 @@ pub const Render = struct {
         c.ClearBackground(c.BLACK);
 
         {
-            const DrawIt = _component.MultiIterator(.{ _texture.TextureObject, _text_field.TextField });
+            const DrawIt = _component.MultiIterator(.{ _texture.TextureObject, _text_field.TextField, _ui_frame.UiFrame });
             const IdUnionTags = @typeInfo(DrawIt.IdUnion).@"union".tag_type.?;
             const tag_texture_object = @field(IdUnionTags, DrawIt.fieldName(_texture.TextureObject));
             const tag_text_field = @field(IdUnionTags, DrawIt.fieldName(_text_field.TextField));
+            const tag_ui_frame = @field(IdUnionTags, DrawIt.fieldName(_ui_frame.UiFrame));
 
             const getDepth = struct {
                 fn _getDepth(comp: DrawIt.SortUnion) i32 {
@@ -103,6 +108,9 @@ pub const Render = struct {
                     tag_text_field => |tf_id| {
                         _text_field.TextField.draw(tf_id);
                     },
+                    tag_ui_frame => |uf_id| {
+                        _ui_frame.UiFrame.draw(uf_id);
+                    },
                 }
             }
         }
@@ -115,17 +123,45 @@ pub const Render = struct {
         const frame_str = std.fmt.bufPrintZ(&frame_str_buffer, "Frame: {d}", .{self.draw_count}) catch unreachable;
         c.DrawText(frame_str, 10, 28, 10, c.GREEN);
     }
+
+    fn handleInput(self: Render) void {
+        const mouse_vec = c.GetMousePosition();
+
+        if (c.IsMouseButtonPressed(c.MOUSE_BUTTON_LEFT)) {
+            const LeftClickIt = _component.MultiIterator(.{_bounds.Bounds});
+            const IdUnionTags = @typeInfo(LeftClickIt.IdUnion).@"union".tag_type.?;
+            const tag_bounds = @field(IdUnionTags, LeftClickIt.fieldName(_bounds.Bounds));
+
+            var left_click_it = LeftClickIt.init(self.alloc, null);
+            defer left_click_it.deinit();
+
+            while (left_click_it.next()) |id_union| {
+                switch (id_union) {
+                    tag_bounds => |b_id| {
+                        var bounds_ref = b_id.read() orelse continue;
+                        defer bounds_ref.close();
+
+                        bounds_ref.comp.handleClick(mouse_vec);
+                    },
+                }
+            }
+        }
+    }
 };
 
-pub fn renderThread(alloc: std.mem.Allocator, logger: *_logging.Logger, context: *GameContext) void {
+pub fn renderThread(alloc: std.mem.Allocator, context: *GameContext) void {
     log.info("Starting render thread", .{});
-    var render = Render.init(alloc, logger, context);
+
+    const render = alloc.create(Render) catch unreachable;
+    defer alloc.destroy(render);
+    render.* = Render.init(alloc, context);
+
     log.debug("Initialized Render", .{});
-    context.render = &render;
+    context.render = render;
     log.debug("Linked Render context", .{});
     defer {
         log.debug("Render deinit and cleanup", .{});
-        if (context.render == &render) {
+        if (context.render == render) {
             context.render = null;
         }
         render.deinit();
@@ -135,6 +171,11 @@ pub fn renderThread(alloc: std.mem.Allocator, logger: *_logging.Logger, context:
     _texture.loadTextures();
     render.state = .Running;
     log.debug("Loaded textures", .{});
+    if (run_startup_tests) {
+        log.info("Running startup tests", .{});
+        _render_test.runFullStartupTest(alloc);
+        log.debug("Finished startup tests", .{});
+    }
     while (!c.WindowShouldClose() and render.state != .Stopping) {
         render.updateLoop();
     }

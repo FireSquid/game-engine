@@ -7,9 +7,12 @@ const _component = @import("../Component/component.zig");
 const ID = _component.ComponentId(TextField);
 
 const _entity = @import("../Entity/entity.zig");
-const _position = @import("position.zig");
+const _position = @import("../Component/position.zig");
 
-pub var draw_wire_debug: bool = true;
+const _ui = @import("../ui.zig");
+pub const Mode = _ui.Mode;
+
+pub var draw_wire_debug: bool = false;
 
 comptime {
     @import("component.zig").registerComponent(TextField);
@@ -21,10 +24,11 @@ pub const TextField = struct {
     cursor: ?u32,
     size: u32,
     text: std.ArrayList(u8),
+    mode: Mode,
 
     pub const thread_safe = true;
 
-    pub fn init(alloc: std.mem.Allocator, entity: _entity.EntityId, depth: i32, size: u32) TextField {
+    pub fn init(alloc: std.mem.Allocator, entity: _entity.EntityId, depth: i32, size: u32, mode: Mode) TextField {
         std.debug.assert(size < 99);
         return TextField{
             .entity = entity,
@@ -33,6 +37,7 @@ pub const TextField = struct {
             .cursor = null,
             .size = size,
             .text = std.ArrayList(u8).init(alloc),
+            .mode = mode,
         };
     }
 
@@ -48,6 +53,7 @@ pub const TextField = struct {
             .cursor = self.cursor,
             .size = self.size,
             .text = self.text.clone() catch unreachable,
+            .mode = self.mode,
         };
     }
 
@@ -73,14 +79,17 @@ pub const TextField = struct {
         defer if (self_entity_ref) |*se_ref| se_ref.close();
 
         const pos = if (self_entity_ref) |se_ref| se_ref.comp.globalPosition() else _position.origin;
-        const _x, const _y = pos.toInt(c_int);
         const _size: c_int = @intCast(self.size);
+        const _width = c.MeasureText(c_text, _size);
+
+        const alignPos = _ui.getAlignPosition(self.mode, pos, @floatFromInt(_width), @floatFromInt(_size));
+
+        const _x, const _y = alignPos.toInt(c_int);
         c.DrawText(c_text, _x, _y, _size, c.WHITE);
 
         if (draw_wire_debug) {
-            const str_width = c.MeasureText(c_text, _size);
-            const margin = 2;
-            c.DrawRectangleLines(_x - margin, _y - margin, str_width + margin * 2, _size + margin * 2, c.WHITE);
+            const margin = 3;
+            c.DrawRectangleLines(_x - margin, _y - margin, _width + margin * 2, _size + margin * 2, c.WHITE);
         }
     }
 };

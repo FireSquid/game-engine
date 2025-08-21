@@ -25,7 +25,7 @@ pub fn createPlanet(alloc: std.mem.Allocator, name: []const u8, pos: c.Vector2, 
     var position_ref = _component.createComponent(_position.Position);
     defer position_ref.save();
 
-    const name_label = _label.createLabel(alloc, name, -10, 16, c.Vector2{ .x = 0.0, .y = 150.0 });
+    const name_label = _label.createLabel(alloc, name, Layers.UI, 16, c.Vector2{ .x = 0.0, .y = 150.0 }, .CENTER_TOP);
 
     var children = [_]_entity.TaggedEntityId{name_label};
     var components = [_]_entity.AnyComponentId{ bg_ref.id.any(), fg_ref.id.any(), position_ref.id.any() };

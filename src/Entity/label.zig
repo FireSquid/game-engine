@@ -12,7 +12,7 @@ const Layers = @import("../Render/render.zig").Layers;
 
 pub const Label = _entity.DefineEntity("Label", .{}, .{ _text_field.TextField, _position.Position });
 
-pub fn createLabel(alloc: std.mem.Allocator, text: ?[]const u8, depth: i32, size: u32, pos: c.Vector2) _entity.TaggedEntityId {
+pub fn createLabel(alloc: std.mem.Allocator, text: []const u8, depth: i32, size: u32, pos: c.Vector2, mode: _text_field.Mode) _entity.TaggedEntityId {
     var text_field_ref = _component.createComponent(_text_field.TextField);
     defer text_field_ref.save();
 
@@ -23,10 +23,8 @@ pub fn createLabel(alloc: std.mem.Allocator, text: ?[]const u8, depth: i32, size
     var components = [_]_entity.AnyComponentId{ text_field_ref.id.any(), position_ref.id.any() };
     const label_tagged = Label.construct(alloc, &children, &components);
 
-    text_field_ref.comp = _text_field.TextField.init(alloc, label_tagged.id, depth, size);
-    if (text) |_text| {
-        text_field_ref.comp.text.appendSlice(_text) catch unreachable;
-    }
+    text_field_ref.comp = _text_field.TextField.init(alloc, label_tagged.id, depth, size, mode);
+    text_field_ref.comp.text.appendSlice(text) catch unreachable;
 
     position_ref.comp = _position.fromVec(pos);
 

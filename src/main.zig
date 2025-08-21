@@ -17,14 +17,9 @@ const t_render = @import("Render/render.zig");
 
 pub const std_options = std.Options{
     .logFn = fileAndIgLog,
-    .log_level = .debug,
+    .log_level = .info,
 
-    .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{ .scope = .component, .level = .info },
-        .{ .scope = .entity, .level = .info },
-        .{ .scope = .text_field, .level = .info },
-        .{ .scope = .texture, .level = .info },
-    },
+    .log_scope_levels = &[_]std.log.ScopeLevel{},
 };
 var logger: ?Logger = null;
 
@@ -65,7 +60,7 @@ pub fn main() !void {
 
     logger = term.logger;
 
-    var render_thread = try std.Thread.spawn(.{ .allocator = alloc }, t_render.renderThread, .{ alloc, &logger.?, &context });
+    var render_thread = try std.Thread.spawn(.{ .allocator = alloc }, t_render.renderThread, .{ alloc, &context });
     render_thread.detach();
 
     while (true) {
@@ -81,7 +76,7 @@ pub fn main() !void {
         _ = try term.inputBar("Press ENTER to start...", &input_buf);
     }
 
-    std.log.info("=== Starting Game Loop ===", .{});
+    std.log.info("Starting Command Loop", .{});
 
     while (true) {
         const cmd_result = term.promptCommand() catch |err| error_blk: {
@@ -93,7 +88,7 @@ pub fn main() !void {
         }
     }
 
-    std.log.info("=== Ending Game Loop ===", .{});
+    std.log.info("Ending Command Loop", .{});
 
     if (context.render) |render| {
         if (render.state == .Running) {
