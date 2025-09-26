@@ -27,7 +27,7 @@ pub fn runFullStartupTest(alloc: std.mem.Allocator) void {
 
     const ctx_2 = _callback.Callback{
         .func = testButtonFn,
-        .ctx = &TestButtonCtx{ .text = "'BTN1'" },
+        .ctx = &TestButtonCtx{ .text = "'BTN2'" },
     };
     _ = _button.createTextButton(alloc, "Test Button 2", .{
         .text_size = 24,

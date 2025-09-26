@@ -66,6 +66,10 @@ pub const Entity = struct {
         self.type_tag = tag(type_name);
     }
 
+    pub fn tagged(self: Entity) TaggedEntityId {
+        return TaggedEntityId{ .id = self.id, .type_tag = self.type_tag.? };
+    }
+
     pub inline fn tag(comptime type_name: []const u8) u32 {
         if (type_name.len == 0) {
             return 0;
@@ -309,7 +313,7 @@ pub fn DefineEntity(comptime type_name: []const u8, comptime children: anytype, 
         }
 
         pub fn construct(lifetime: std.mem.Allocator, entity_ids: ?[]TaggedEntityId, component_ids: ?[]AnyComponentId) TaggedEntityId {
-            log.debug("Constructing Entity '{s}' ({d})", .{ _type_name, type_tag });
+            log.info("Constructing Entity '{s}' ({d})", .{ _type_name, type_tag });
             var entity_ref = EntityId.create();
             defer entity_ref.save();
 

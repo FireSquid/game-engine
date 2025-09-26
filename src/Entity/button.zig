@@ -8,6 +8,7 @@ const _entity = @import("../Entity/entity.zig");
 const _component = @import("../Component/component.zig");
 const _ui_frame = @import("../Component/ui_frame.zig");
 const _text_field = @import("../Component/text_field.zig");
+const _texture = @import("../Component/texture.zig");
 const _position = @import("../Component/position.zig");
 const _bounds = @import("../Component/bounds.zig");
 const _callback = @import("../Component/callback.zig");
@@ -27,7 +28,7 @@ pub const TextButtonArgs = struct {
     fill: ?c.Color = c.GRAY,
     line: ?c.Color = null,
     line_thick: f32 = 0.0,
-    mode: _text_field.Mode = .CENTER_MID,
+    mode: _ui.Mode = .CENTER_MID,
     click: _callback.Callback,
 };
 pub fn createTextButton(alloc: std.mem.Allocator, text: []const u8, args: TextButtonArgs) _entity.TaggedEntityId {
@@ -63,9 +64,55 @@ pub fn createTextButton(alloc: std.mem.Allocator, text: []const u8, args: TextBu
 
     ui_frame_ref.comp = _ui_frame.UiFrame.init(text_button_tagged.id, args.base_depth, dim, args.fill, args.line, args.line_thick, args.mode);
 
-    bounds_ref.comp = _bounds.Bounds.init(text_button_tagged, args.pos, dim, args.mode, .{ .click = args.click });
+    bounds_ref.comp = _bounds.Bounds.init(text_button_tagged, dim, args.mode, .{ .click = args.click });
 
     position_ref.comp = _position.fromVec(args.pos);
 
     return text_button_tagged;
+}
+
+pub const TextureButton = _entity.DefineEntity("TextureButton", .{}, .{ _texture.TextureObject, _bounds.Bounds, _position.Position });
+
+pub const TextureButtonArgs = struct {
+    texture_id: u32,
+    mode: _ui.Mode = .LEFT_TOP,
+    pos: c.Vector2,
+    rotation: f32 = 0.0,
+    scale: f32 = 0.0,
+    color: c.Color = c.WHITE,
+    depth: i32 = Layers.UI,
+    click: _callback.Callback,
+};
+pub fn createTextureButton(alloc: std.mem.Allocator, args: TextureButtonArgs) _entity.TaggedEntityId {
+    log.debug("Creating Texture Button", .{});
+    var tex_obj_ref = _component.createComponent(_texture.TextureObject);
+    defer tex_obj_ref.save();
+
+    var bounds_ref = _component.createComponent(_bounds.Bounds);
+    defer bounds_ref.save();
+
+    var position_ref = _component.createComponent(_position.Position);
+    defer position_ref.save();
+
+    var children = [_]_entity.TaggedEntityId{};
+    var components = [_]_entity.AnyComponentId{ tex_obj_ref.id.any(), bounds_ref.id.any(), position_ref.id.any() };
+    const texture_button = TextureButton.construct(alloc, &children, &components);
+
+    tex_obj_ref.comp = _texture.TextureObject.init(texture_button.id, .{
+        .texture_id = args.texture_id,
+        .mode = args.mode,
+        .rot = args.rotation,
+        .scale = args.scale,
+        .color = args.color,
+        .depth = args.depth,
+    });
+
+    const texture_size = _texture.textureSize(args.texture_id);
+    const scaled_size = c.Vector2{ .x = texture_size.x * args.scale, .y = texture_size.y * args.scale };
+
+    bounds_ref.comp = _bounds.Bounds.init(texture_button, scaled_size, args.mode, .{ .click = args.click });
+
+    position_ref.comp = _position.fromVec(args.pos);
+
+    return texture_button;
 }

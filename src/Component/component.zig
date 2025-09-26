@@ -118,6 +118,13 @@ pub fn componentIterator(comptime T: type, alloc: std.mem.Allocator) ComponentSe
     return @field(component_store, CompSetFieldName(T)).iterator(alloc);
 }
 
+pub fn componentAlloc(comptime T: type) std.mem.Allocator {
+    comptime {
+        assertRegistered(T);
+    }
+    return @field(component_store, CompSetFieldName(T)).alloc;
+}
+
 fn lockSet(comptime T: type) void {
     comptime {
         assertRegistered(T);

@@ -6,9 +6,12 @@ const c = @import("../c.zig");
 const _component = @import("component.zig");
 
 const _render = @import("../Render/render.zig");
+const Layers = _render.Layers;
 
 const _entity = @import("../Entity/entity.zig");
 const _position = @import("position.zig");
+
+const _ui = @import("../ui.zig");
 
 pub var context: ?*@import("../game_context.zig").GameContext = null;
 pub var draw_wire_debug: bool = true;
@@ -68,6 +71,15 @@ pub const Texture = struct {
     }
 };
 
+fn idToCTexture(tex_id: u32) c.Texture2D {
+    return textures.?[tex_id].texture;
+}
+
+pub fn textureSize(tex_id: u32) c.Vector2 {
+    const tex_ptr = &textures.?[tex_id].texture;
+    return c.Vector2{ .x = @floatFromInt(tex_ptr.width), .y = @floatFromInt(tex_ptr.height) };
+}
+
 const ID = _component.ComponentId(TextureObject);
 comptime {
     @import("component.zig").registerComponent(TextureObject);
@@ -75,6 +87,7 @@ comptime {
 pub const TextureObject = struct {
     entity: _entity.EntityId,
     texture: u32,
+    mode: _ui.Mode,
     rot: f32,
     scale: f32,
     color: c.Color,
@@ -82,15 +95,24 @@ pub const TextureObject = struct {
 
     pub const thread_safe = true;
 
-    pub fn init(entity_id: _entity.EntityId, texture_id: u32, rot: f32, scale: f32, color: c.Color, depth: i32) TextureObject {
-        log.info("Init Texture Object with texture id <{d}>", .{texture_id});
+    pub const TextureObjectArgs = struct {
+        texture_id: u32,
+        mode: _ui.Mode = .LEFT_TOP,
+        rot: f32 = 0.0,
+        scale: f32 = 1.0,
+        color: c.Color = c.WHITE,
+        depth: i32 = Layers.Foreground,
+    };
+    pub fn init(entity_id: _entity.EntityId, args: TextureObjectArgs) TextureObject {
+        log.info("Init Texture Object with texture id <{d}>", .{args.texture_id});
         return TextureObject{
             .entity = entity_id,
-            .texture = texture_id,
-            .rot = rot,
-            .scale = scale,
-            .depth = depth,
-            .color = color,
+            .texture = args.texture_id,
+            .mode = args.mode,
+            .rot = args.rot,
+            .scale = args.scale,
+            .color = args.color,
+            .depth = args.depth,
         };
     }
 
@@ -109,16 +131,22 @@ pub const TextureObject = struct {
         var self_entity_ref = self.entity.read() orelse null;
         defer if (self_entity_ref) |*se_ref| se_ref.close();
 
+        const width = @as(f32, @floatFromInt(_texture.width)) * self.scale;
+        const height = @as(f32, @floatFromInt(_texture.height)) * self.scale;
+
         const pos = if (self_entity_ref) |se_ref| se_ref.comp.globalPosition() else _position.origin;
-        c.DrawTextureEx(_texture, pos.vec, self.rot, self.scale, self.color);
+        const align_pos = _ui.getAlignPosition(self.mode, pos, width, height);
+
+        c.DrawTextureEx(_texture, align_pos.vec, self.rot, self.scale, self.color);
 
         if (draw_wire_debug) {
             std.debug.assert(_texture.width < 9999 and _texture.height < 9999);
-            const width = @as(f32, @floatFromInt(_texture.width)) * self.scale;
-            const height = @as(f32, @floatFromInt(_texture.height)) * self.scale;
 
-            const rect = c.Rectangle{ .x = pos.vec.x, .y = pos.vec.y, .width = width, .height = height };
+            const rect = c.Rectangle{ .x = align_pos.vec.x, .y = align_pos.vec.y, .width = width, .height = height };
             c.DrawRectangleLinesEx(rect, 1, c.WHITE);
+
+            c.DrawCircleV(pos.vec, 5, c.BLACK);
+            c.DrawCircleLinesV(pos.vec, 5, c.WHITE);
         }
     }
 
@@ -126,7 +154,3 @@ pub const TextureObject = struct {
         return lhs.depth > rhs.depth;
     }
 };
-
-fn idToCTexture(tex_id: u32) c.Texture2D {
-    return textures.?[tex_id].texture;
-}

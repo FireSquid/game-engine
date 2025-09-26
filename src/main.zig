@@ -19,7 +19,10 @@ pub const std_options = std.Options{
     .logFn = fileAndIgLog,
     .log_level = .info,
 
-    .log_scope_levels = &[_]std.log.ScopeLevel{},
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .bounds, .level = .debug },
+        .{ .scope = .callback, .level = .debug },
+    },
 };
 var logger: ?Logger = null;
 

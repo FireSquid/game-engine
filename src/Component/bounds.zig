@@ -19,22 +19,27 @@ comptime {
 }
 pub const Bounds = struct {
     entity: _entity.TaggedEntityId,
-    rect: c.Rectangle,
+    mode: _ui.Mode,
+    dim: c.Vector2,
     click_callback: ?_callback.Callback,
 
-    pub fn init(entity: _entity.TaggedEntityId, pos: c.Vector2, dim: c.Vector2, rect_mode: _ui.Mode, callbacks: CallbackArgs) Bounds {
-        const bounds_pos = _ui.getAlignPosition(rect_mode, _position.fromVec(pos), dim.x, dim.y).vec;
-        const bounds_rect = c.Rectangle{ .x = bounds_pos.x, .y = bounds_pos.y, .width = dim.x, .height = dim.y };
+    pub fn init(entity: _entity.TaggedEntityId, dim: c.Vector2, mode: _ui.Mode, callbacks: CallbackArgs) Bounds {
         return Bounds{
             .entity = entity,
-            .rect = bounds_rect,
+            .mode = mode,
+            .dim = dim,
             .click_callback = callbacks.click,
         };
     }
 
     pub fn within(self: Bounds, point: c.Vector2) bool {
-        const in_x = point.x >= self.rect.x and point.x <= (self.rect.x + self.rect.width);
-        const in_y = point.y >= self.rect.y and point.y <= (self.rect.y + self.rect.height);
+        var self_entity_ref = self.entity.read() orelse null;
+        defer if (self_entity_ref) |*se_ref| se_ref.close();
+        const pos = if (self_entity_ref) |se_ref| se_ref.comp.globalPosition() else _position.origin;
+        const align_pos = _ui.getAlignPosition(self.mode, pos, self.dim.x, self.dim.y).vec;
+
+        const in_x = point.x >= align_pos.x and point.x <= (align_pos.x + self.dim.x);
+        const in_y = point.y >= align_pos.y and point.y <= (align_pos.y + self.dim.y);
 
         return in_x and in_y;
     }
@@ -42,6 +47,8 @@ pub const Bounds = struct {
     pub fn handleClick(self: Bounds, mouse_vec: c.Vector2) void {
         if (self.click_callback) |callback| {
             if (self.within(mouse_vec)) {
+                log.debug("Handling click callback [{}]", .{callback});
+                log.debug("Callback Entity [{}]", .{self.entity});
                 callback.call(self.entity);
             }
         }
