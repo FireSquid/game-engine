@@ -73,21 +73,7 @@ pub fn getPlanetName(alloc: std.mem.Allocator, planet_id: _entity.TaggedEntityId
 fn planetBtnTest(src_id: _entity.TaggedEntityId, ctx: *const anyopaque) void {
     _ = ctx;
 
-    var btn_ref = src_id.read() orelse {
-        log.err("Missing button id", .{});
-        return;
-    };
-    defer btn_ref.close();
-
-    var planet_ref = btn_ref.comp.readParent() orelse {
-        log.err("Missing parent planet", .{});
-        return;
-    };
-    defer planet_ref.close();
-
-    const planet_id = planet_ref.comp.tagged();
-
-    if (Planet.component(planet_id, _text_field.TextField, &[_]type{_label.Label})) |name_id| {
+    if (Planet.findComponentInTree(src_id.id, _text_field.TextField, &[_]type{_label.Label})) |name_id| {
         var name_ref = _component.readComponent(_text_field.TextField, name_id) orelse {
             log.warn("Unable to get planet name reference", .{});
             return;

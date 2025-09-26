@@ -347,6 +347,21 @@ pub fn DefineEntity(comptime type_name: []const u8, comptime children: anytype, 
             return TaggedEntityId.init(entity_ref.id, type_name);
         }
 
+        pub fn findComponentInTree(entity_id: EntityId, comptime T: type, comptime entity_path: []const type) ?ComponentId(T) {
+            var current_entity = entity_id;
+
+            while (true) {
+                var entity_ref = current_entity.read() orelse return null;
+                defer entity_ref.close();
+
+                if (entity_ref.comp.checkTag(type_name)) {
+                    return component(entity_ref.comp.tagged(), T, entity_path);
+                }
+
+                current_entity = entity_ref.comp.parent orelse return null;
+            }
+        }
+
         pub fn component(tagged_id: TaggedEntityId, comptime T: type, comptime entity_path: []const type) ?ComponentId(T) {
             log.debug("'{s}' -> ({d}) -> Component:'{s}'", .{ _type_name, entity_path.len, @typeName(T) });
             _component.assertRegistered(T);
